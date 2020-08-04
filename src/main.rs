@@ -77,9 +77,7 @@ impl Fetcher {
 
             let (_, _, repos) = match client
                 .get()
-                .orgs()
-                .org(&name)
-                .repos()
+                .custom_endpoint(&format!("orgs/{}/repos?per_page=100&page=1", name))
                 .execute::<Vec<Repo>>()
             {
                 Ok(v) => v,
@@ -135,8 +133,8 @@ async fn git_pull(repo: &Repo) -> Result<TempDir> {
     let cur_dir = env::current_dir().context("failed to get current directory")?;
     let tmp_dir = TempDir::new_in(&cur_dir.join(".data"))?;
 
-    Command::new("git")
-        .arg("pull")
+    let output = Command::new("git")
+        .arg("clone")
         .arg("--depth")
         .arg("1")
         .arg(&repo.clone_url)
@@ -145,11 +143,16 @@ async fn git_pull(repo: &Repo) -> Result<TempDir> {
         .await
         .with_context(|| format!("failed to clone {}", repo.clone_url))?;
 
+    eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+
     Ok(tmp_dir)
 }
 
 fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
     async move {
+        eprintln!("check_all_files: {}", dir.display());
+
         let mut entries = read_dir(dir)
             .await
             .with_context(|| format!("failed to read dir: {}", dir.display()))?;
@@ -162,6 +165,8 @@ fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
             };
 
             let path = entry.path();
+            eprintln!("Checking {}", path.display());
+
             let ty = entry.file_type().await?;
             if ty.is_dir() {
                 check_all_files(&path).await?;
