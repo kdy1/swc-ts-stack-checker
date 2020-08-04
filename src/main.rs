@@ -169,7 +169,9 @@ fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
             let ty = entry.file_type().await?;
             if ty.is_dir() {
                 check_all_files(&path).await?;
-            } else if ty.is_file() && path.ends_with(".ts") {
+            } else if ty.is_file()
+                && (path.ends_with(".ts") || path.ends_with(".tsx") || path.ends_with(".js"))
+            {
                 let path = path.clone();
                 spawn_blocking(move || check_file(&path)).await??;
             }
