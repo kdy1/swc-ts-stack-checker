@@ -165,7 +165,6 @@ fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
             };
 
             let path = entry.path();
-            eprintln!("Checking {}", path.display());
 
             let ty = entry.file_type().await?;
             if ty.is_dir() {
@@ -182,6 +181,8 @@ fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
 }
 
 fn check_file(path: &Path) -> Result<()> {
+    eprintln!("Checking {}", path.display());
+
     let cm: Lrc<SourceMap> = Default::default();
     let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
 
