@@ -69,27 +69,32 @@ struct Fetcher {
 impl Fetcher {
     pub async fn repos_of_org(&self, name: String) -> Result<Vec<Repo>> {
         let token = self.token.clone();
-        let client = Github::new(token).unwrap();
 
-        eprintln!("Organization: {}", name);
-        let (_, _, repos) = match client
-            .get()
-            .orgs()
-            .org(&name)
-            .repos()
-            .execute::<Vec<Repo>>()
-        {
-            Ok(v) => v,
-            Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
-        };
+        spawn_blocking(move || {
+            eprintln!("Organization: {}", name);
 
-        Ok(repos.unwrap_or_default())
+            let client = Github::new(token).unwrap();
+
+            let (_, _, repos) = match client
+                .get()
+                .orgs()
+                .org(&name)
+                .repos()
+                .execute::<Vec<Repo>>()
+            {
+                Ok(v) => v,
+                Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
+            };
+
+            Ok(repos.unwrap_or_default())
+        })
+        .await?
     }
 
     pub async fn list_repositories(&self) -> Result<Vec<Repo>> {
         let token = self.token.clone();
 
-        let v = spawn_blocking(move || -> Result<_> {
+        let orgs = spawn_blocking(move || -> Result<_> {
             let client = Github::new(token).unwrap();
             let orgs = client.get().organizations().execute::<Vec<Org>>();
             let (_, _, orgs) = match orgs {
@@ -97,36 +102,24 @@ impl Fetcher {
                 Err(err) => bail!("failed to fetch oranizations: {:?}", err),
             };
 
-            let mut buf = vec![];
-
-            if let Some(orgs) = orgs {
-                for org in orgs {
-                    let (_, _, repos) = match client
-                        .get()
-                        .orgs()
-                        .org(&org.login)
-                        .repos()
-                        .execute::<Vec<Repo>>()
-                    {
-                        Ok(v) => v,
-                        Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
-                    };
-
-                    if let Some(repos) = repos {
-                        buf.extend(
-                            repos
-                                .into_iter()
-                                .filter(|repo| !repo.archived && !repo.fork),
-                        );
-                    }
-                }
-            }
-
-            Ok(buf)
+            Ok(orgs)
         })
-        .await?;
+        .await??;
 
-        Ok(v?)
+        let mut buf = vec![];
+
+        if let Some(orgs) = orgs {
+            for org in orgs {
+                let repos = self.repos_of_org(org.login).await?;
+                buf.extend(
+                    repos
+                        .into_iter()
+                        .filter(|repo| !repo.archived && !repo.fork),
+                );
+            }
+        }
+
+        Ok(buf)
     }
 }
 
