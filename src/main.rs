@@ -19,7 +19,21 @@ async fn main() -> Result<()> {
         token: env::var("GITHUB_TOKEN").expect("Environment variable `GITHUB_TOKEN` is required"),
     };
 
-    let repos = fetcher.list_repositories().await?;
+    let args = env::args();
+    let repos = if args.len() != 1 {
+        let mut repos = vec![];
+        let mut tasks = vec![];
+        for arg in args.into_iter().skip(1) {
+            tasks.push(fetcher.repos_of_org(arg));
+        }
+        for task in tasks {
+            repos.push(task.await?);
+        }
+        repos.into_iter().flatten().collect()
+    } else {
+        fetcher.list_repositories().await?
+    };
+
     let mut tasks = vec![];
 
     for repo in repos {
@@ -53,6 +67,25 @@ struct Fetcher {
 }
 
 impl Fetcher {
+    pub async fn repos_of_org(&self, name: String) -> Result<Vec<Repo>> {
+        let token = self.token.clone();
+        let client = Github::new(token).unwrap();
+
+        eprintln!("Organization: {}", name);
+        let (_, _, repos) = match client
+            .get()
+            .orgs()
+            .org(&name)
+            .repos()
+            .execute::<Vec<Repo>>()
+        {
+            Ok(v) => v,
+            Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
+        };
+
+        Ok(repos.unwrap_or_default())
+    }
+
     pub async fn list_repositories(&self) -> Result<Vec<Repo>> {
         let token = self.token.clone();
 
@@ -68,7 +101,6 @@ impl Fetcher {
 
             if let Some(orgs) = orgs {
                 for org in orgs {
-                    println!("Organization: {}", org.login);
                     let (_, _, repos) = match client
                         .get()
                         .orgs()
@@ -105,6 +137,8 @@ async fn handle(repo: Repo) -> Result<()> {
 }
 
 async fn git_pull(repo: &Repo) -> Result<TempDir> {
+    eprintln!("Pulling {}", repo.clone_url);
+
     let cur_dir = env::current_dir().context("failed to get current directory")?;
     let tmp_dir = TempDir::new_in(&cur_dir.join(".data"))?;
 
