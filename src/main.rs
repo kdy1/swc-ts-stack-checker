@@ -77,13 +77,13 @@ impl Fetcher {
 
             let mut buf = vec![];
             for i in 0..10 {
-                let (_, _, repos) = match client
+                let repos = match client
                     .get()
                     .custom_endpoint(&format!("orgs/{}/repos?per_page=100&page={}", name, i + 1))
                     .execute::<Vec<Repo>>()
                 {
-                    Ok(v) => v,
-                    Err(_) => vec![],
+                    Ok(v) => v.2,
+                    Err(_) => None,
                 };
 
                 if let Some(repos) = repos {
