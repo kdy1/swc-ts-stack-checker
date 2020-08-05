@@ -160,6 +160,10 @@ fn check_all_files(dir: &Path) -> BoxFuture<Result<()>> {
     async move {
         eprintln!("check_all_files: {}", dir.display());
 
+        if dir.ends_with(".git") {
+            return Ok(());
+        }
+
         let mut entries = read_dir(dir)
             .await
             .with_context(|| format!("failed to read dir: {}", dir.display()))?;
