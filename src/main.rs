@@ -83,7 +83,7 @@ impl Fetcher {
                     .execute::<Vec<Repo>>()
                 {
                     Ok(v) => v,
-                    Err(_) => {}
+                    Err(_) => vec![],
                 };
 
                 if let Some(repos) = repos {
