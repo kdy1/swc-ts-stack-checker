@@ -75,16 +75,23 @@ impl Fetcher {
 
             let client = Github::new(token).unwrap();
 
-            let (_, _, repos) = match client
-                .get()
-                .custom_endpoint(&format!("orgs/{}/repos?per_page=100&page=1", name))
-                .execute::<Vec<Repo>>()
-            {
-                Ok(v) => v,
-                Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
-            };
+            let mut buf = vec![];
+            for i in 0..10 {
+                let (_, _, repos) = match client
+                    .get()
+                    .custom_endpoint(&format!("orgs/{}/repos?per_page=100&page={}", name, i + 1))
+                    .execute::<Vec<Repo>>()
+                {
+                    Ok(v) => v,
+                    Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
+                };
 
-            Ok(repos.unwrap_or_default())
+                if let Some(repos) = repos {
+                    buf.extend(repos);
+                }
+            }
+
+            Ok(buf)
         })
         .await?
     }
