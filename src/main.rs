@@ -83,7 +83,7 @@ impl Fetcher {
                     .execute::<Vec<Repo>>()
                 {
                     Ok(v) => v,
-                    Err(err) => bail!("failed to fetch repository of organizations: {:?}", err),
+                    Err(_) => {}
                 };
 
                 if let Some(repos) = repos {
